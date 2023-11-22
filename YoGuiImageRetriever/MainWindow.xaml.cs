@@ -1,4 +1,6 @@
-﻿using System.Net.Http;
+﻿using Newtonsoft.Json;
+using System.Diagnostics;
+using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,64 +40,65 @@ namespace YoGuiImageRetriever
         private async Task GetImageAsync()
         {
             string searchText = StringUtilities.FormatText(SearchBox.Text);
-            bool r = await CheckLink(searchText);
-            if (!r)
+            Root root = await CheckLink(searchText);
+            if (root == null)
             {
-                UrlBlock.Foreground = new SolidColorBrush(Colors.IndianRed);
+                SearchBox.BorderBrush = new SolidColorBrush(Colors.IndianRed);
                 return;
             }
 
-            UrlBlock.Foreground = new SolidColorBrush(Colors.Black);
+            SearchBox.BorderBrush = new SolidColorBrush(Colors.Black);
+            string url = root.Data.First().CardImages.First().ImageUrl;
+            DownloadImage(url);
         }
 
-        private async Task<bool> CheckLink(string cardName)
+        private async Task<Root> CheckLink(string cardName)
         {
-            string url = $"https://www.yugiohcardguide.com/single/{cardName}.html";
-            UrlBlock.Text = url;
-
+            string url = $"https://db.ygoprodeck.com/api/v7/cardinfo.php?name={cardName}";
             try
             {
                 using (HttpClient client = new HttpClient())
                 using (HttpResponseMessage response = await client.GetAsync(url))
                 {
+                    string content = await response.Content.ReadAsStringAsync();
                     if (response.IsSuccessStatusCode)
                     {
-                        // Check if the response body contains specific content indicating an error
-                        string responseBody = await response.Content.ReadAsStringAsync();
-                        if (responseBody.Contains("missing.html"))
+                        try
                         {
-                            return false;
+                            return JsonConvert.DeserializeObject<Root>(content);
                         }
-
-                        // The link is available
-                        return true;
+                        catch { return null; }
                     }
-                    else if (IsRedirect(response.StatusCode))
-                    {
-                        // The link is redirected
-                        return false;
-                    }
-                    else
-                    {
-                        // The link is not available or other error
-                        return false;
-                    }
+                    else return null;
                 }
             }
             catch (HttpRequestException)
             {
                 // An exception occurred during the request
-                return false;
+                return null;
             }
         }
 
-        static bool IsRedirect(System.Net.HttpStatusCode statusCode)
-        {
-            return statusCode == System.Net.HttpStatusCode.MovedPermanently ||
-                   statusCode == System.Net.HttpStatusCode.Found ||
-                   statusCode == System.Net.HttpStatusCode.SeeOther ||
-                   statusCode == System.Net.HttpStatusCode.TemporaryRedirect ||
-                   statusCode == System.Net.HttpStatusCode.PermanentRedirect;
+        private async void DownloadImage(string imageUrl)
+        { 
+            using (HttpClient httpClient = new HttpClient())
+            {
+                try
+                {
+                    byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
+                    BitmapImage bitmapImage = new BitmapImage();
+
+                    bitmapImage.BeginInit();
+                    bitmapImage.StreamSource = new System.IO.MemoryStream(imageBytes);
+                    bitmapImage.EndInit();
+
+                    YuGiOhImage.Source = bitmapImage;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error downloading image: {ex.Message}");
+                }
+            }
         }
     }
 }

@@ -16,14 +16,12 @@
             <RowDefinition
                 Height="auto" />
             <RowDefinition
-                Height="509" />
+                Height="*" />
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
 
             <Grid.RowDefinitions>
-                <RowDefinition
-                    Height="auto" />
                 <RowDefinition
                     Height="auto" />
                 <RowDefinition
@@ -35,28 +33,24 @@
                 Margin="2,2,35,2"
                 KeyDown="SearchBox_KeyDown"/>
 
-            <Button
-                x:Name="SearchButton" 
-                Width="31"
-                HorizontalAlignment="Right"
-                Content="GO"
-                HorizontalContentAlignment="Center"
-                Margin="2"
-                Padding="0"
-                Click="SearchButton_Click"
-                ClickMode="Release"/>
+			<Button x:Name="SearchButton"
+					Width="31"
+					HorizontalAlignment="Right"
+					Content="GO"
+					HorizontalContentAlignment="Center"
+					Margin="2"
+					Padding="0"
+					Click="SearchButton_Click"
+					ClickMode="Release" />
 
-            <TextBlock
-                x:Name="UrlBlock" 
-                Grid.Row="1"
-                Margin="2"/>
-
-        </Grid>
+		</Grid>
 
         <Image
             x:Name="YuGiOhImage" 
             Grid.Row="1"
-            Stretch="Uniform"/>
+            Stretch="Uniform"
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center"/>
 
     </Grid>
 </Window>
