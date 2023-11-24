@@ -1,5 +1,8 @@
 ﻿using Newtonsoft.Json;
+using System.Collections;
 using System.Diagnostics;
+using System.Drawing;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Windows;
@@ -22,82 +25,265 @@ namespace YoGuiImageRetriever
         public MainWindow()
         {
             InitializeComponent();
+            string localPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            LocalDictionaryPath = localPath + @"\YogiohImageRetriever\dictionary.json";
+            UserConfFilePath = localPath + @"\YogiohImageRetriever\.conf";
+            CardsFolderPath = localPath + @"\YogiohImageRetriever\Cards";
+            Initialization();
         }
 
-        private void SearchButton_Click(object sender, RoutedEventArgs e)
-        {
-            _ = GetImageAsync();
-        }
+        private readonly string LocalDictionaryPath;
+        private readonly string UserConfFilePath;
+        private readonly string CardsFolderPath;
+        private ImageRatio CurrentImageRatio {  get; set; }
+        private ImagePreviewWindow _previewWindow;
+        private Dictionary<string, int> SuggestionDictionary { get; set; }
+        private string CurrentCardName { get; set; }
+        private int CurrentCardId { get; set; }
+        private string CurrentCardImagePath {  get; set; }
+        private int CurrentCardHeight { get; set; }
+        private int CurrentCardWidth { get; set; }
 
-        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+        private void Initialization()
         {
-            if(e.Key == Key.Enter)
+            // Local dictionary file already exist ?
+            if(!File.Exists(LocalDictionaryPath))
             {
-                _ = GetImageAsync();
+                // Get dictionary from api
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(LocalDictionaryPath));
+                _ = GetDataFromWebAsync();
             }
+            // Parse dictionary in app.
+            GetDataLocal();
         }
 
-        private async Task GetImageAsync()
+        #region Non control functions
+
+
+        /// <summary>
+        /// Get data from web API and save dictionary of card name and ID.
+        /// </summary>
+        private async Task GetDataFromWebAsync()
         {
-            string searchText = StringUtilities.FormatText(SearchBox.Text);
-            Root root = await CheckLink(searchText);
+            // Get full cards dictionary
+            string dictionaryUrl = @"https://db.ygoprodeck.com/api/v7/cardinfo.php";
+            Root root = await WebLogic.RetrieveDataFromApi(dictionaryUrl);
             if (root == null)
             {
-                SearchBox.BorderBrush = new SolidColorBrush(Colors.IndianRed);
+                MessageBox.Show($"Cannot initialize app because api request send nothing back.");
                 return;
             }
 
-            SearchBox.BorderBrush = new SolidColorBrush(Colors.Black);
-            string url = root.Data.First().CardImages.First().ImageUrl;
-            DownloadImage(url);
+            // Create dictionary and save it localy.
+            Dictionary<string, int> dictionary = [];
+            foreach (Card card in root.Data)
+            {
+                dictionary.Add(card.Name, card.Id);
+            }
+            LocalLogic.SaveDictionary(LocalDictionaryPath, dictionary);
         }
 
-        private async Task<Root> CheckLink(string cardName)
+        private void GetDataLocal()
         {
-            string url = $"https://db.ygoprodeck.com/api/v7/cardinfo.php?name={cardName}";
-            try
+            // Retrieve local dictionary.
+            // Put suggestion in the list.
+            SuggestionDictionary = LocalLogic.LoadDictionary(LocalDictionaryPath);
+            SuggestionListBox.Items.Clear();
+            foreach (KeyValuePair<string, int> entry in SuggestionDictionary)
             {
-                using (HttpClient client = new HttpClient())
-                using (HttpResponseMessage response = await client.GetAsync(url))
+                SuggestionListBox.Items.Add(entry.Key);
+            }
+
+            // Add Combobox items
+            ImageRatio[] imageRatios = (ImageRatio[])Enum.GetValues(typeof(ImageRatio));
+            int irCount = imageRatios.Length;
+            foreach (ImageRatio ir in imageRatios)
+            {
+                string irDescription = LocalLogic.GetEnumDescription(ir);
+                ImageRatioSelector.Items.Add(irDescription);
+            }
+            // Check what index to choose.
+            int index = LocalLogic.GetRatioSelection(UserConfFilePath);
+            if (index > irCount - 1 && index < 0) index = 1;
+            ImageRatioSelector.SelectedIndex = index;
+        }
+
+        private void HandleImageSelectorChange()
+        {
+            // Looking to find the ImageRatio that fit the combobox selection
+            ImageRatio[] imageRatios = (ImageRatio[])Enum.GetValues(typeof(ImageRatio));
+            foreach (ImageRatio ir in imageRatios)
+            {
+                string irDescription = LocalLogic.GetEnumDescription(ir);
+                if (irDescription == ImageRatioSelector.SelectedValue.ToString())
                 {
-                    string content = await response.Content.ReadAsStringAsync();
-                    if (response.IsSuccessStatusCode)
-                    {
-                        try
-                        {
-                            return JsonConvert.DeserializeObject<Root>(content);
-                        }
-                        catch { return null; }
-                    }
-                    else return null;
+                    CurrentImageRatio = ir;
+                    CurrentCardWidth = LocalLogic.GetEnumRatioWidth(ir);
+                    CurrentCardHeight = LocalLogic.GetEnumRatioHeight(ir);
+                    // Save the index selection.
+                    LocalLogic.SaveConf(UserConfFilePath, ImageRatioSelector.SelectedIndex);
+                    break;
                 }
             }
-            catch (HttpRequestException)
+
+            // Indicate size in main window.
+            CustomHeightTextBox.Text = CurrentCardHeight.ToString();
+            CustomWidthTextBox.Text = CurrentCardWidth.ToString();
+
+            CustomHeightTextBox.IsEnabled = CurrentImageRatio == ImageRatio.Undefine;
+            CustomWidthTextBox.IsEnabled = CurrentImageRatio == ImageRatio.Undefine;
+
+
+            // Change image size on the preview window.
+            // Is there a windows ?
+            if (_previewWindow == null) return;
+
+            // Retrieve local image path
+            string imgPath = LocalLogic.GetLocalImagePath(CardsFolderPath, CurrentCardId, CurrentImageRatio);
+            if (string.IsNullOrEmpty(imgPath)) return;
+            if (!File.Exists(imgPath)) return;
+
+            CurrentCardImagePath = imgPath;
+
+            _previewWindow.UpdateImage(CurrentCardImagePath, CurrentCardWidth, CurrentCardHeight);
+        }
+
+        private async Task CardFound()
+        {
+            string selection = SuggestionListBox.SelectedItem.ToString();
+            SearchBox.Text = selection;
+
+            // Found the selection in the dictionary
+            foreach (KeyValuePair<string, int> pair in SuggestionDictionary)
             {
-                // An exception occurred during the request
-                return null;
+                if (pair.Key == selection)
+                {
+                    CurrentCardId = pair.Value;
+                    CurrentCardName = pair.Key;
+
+                    // Is there a selected card ?
+                    if (CurrentCardId <= 0 && string.IsNullOrEmpty(CurrentCardName)) return;
+
+                    // Is the card stored localy ?
+                    bool r = LocalLogic.IsCardOnLocal(CardsFolderPath, CurrentCardId);
+
+                    if (!r)
+                    {
+                        // Dowload all the images.
+                        string imgUrl = WebLogic.GetCardImageUrl(CurrentCardId, ImageRatio.FullCard);
+                        if (!string.IsNullOrEmpty(imgUrl))
+                        {
+                            Bitmap img = await WebLogic.GetBitmapFromApi(imgUrl);
+                            LocalLogic.SaveImageLocaly(CardsFolderPath, img, CurrentCardId, ImageRatio.FullCard);
+                        }
+                        imgUrl = WebLogic.GetCardImageUrl(CurrentCardId, ImageRatio.SmallCard);
+                        if (!string.IsNullOrEmpty(imgUrl))
+                        {
+                            Bitmap img = await WebLogic.GetBitmapFromApi(imgUrl);
+                            LocalLogic.SaveImageLocaly(CardsFolderPath, img, CurrentCardId, ImageRatio.SmallCard);
+                        }
+                        imgUrl = WebLogic.GetCardImageUrl(CurrentCardId, ImageRatio.CroppedCard);
+                        if (!string.IsNullOrEmpty(imgUrl))
+                        {
+                            Bitmap img = await WebLogic.GetBitmapFromApi(imgUrl);
+                            LocalLogic.SaveImageLocaly(CardsFolderPath, img, CurrentCardId, ImageRatio.CroppedCard);
+                        }
+                    }
+
+                    if (_previewWindow == null) return;
+
+                    // Retrieve local image path
+                    string imgPath = LocalLogic.GetLocalImagePath(CardsFolderPath, CurrentCardId, CurrentImageRatio);
+                    if (string.IsNullOrEmpty(imgPath)) return;
+                    if (!File.Exists(imgPath)) return;
+
+                    CurrentCardImagePath = imgPath;
+
+                    _previewWindow.UpdateImage(CurrentCardImagePath, CurrentCardWidth, CurrentCardHeight);
+                }
             }
         }
 
-        private async void DownloadImage(string imageUrl)
-        { 
-            using (HttpClient httpClient = new HttpClient())
+        #endregion
+
+        private void OpenClosePreviewButton_Click(object sender, RoutedEventArgs e)
+        {
+            if(_previewWindow != null)
             {
-                try
+                _previewWindow.Close();
+                _previewWindow = null;
+            }
+            else
+            {
+                _previewWindow = new ImagePreviewWindow();
+                _previewWindow.Show();
+                // Is there a selected card ?
+                if (CurrentCardId > 0 && !string.IsNullOrEmpty(CurrentCardName))
                 {
-                    byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
-                    BitmapImage bitmapImage = new BitmapImage();
+                    // Set Image to preview window.
 
-                    bitmapImage.BeginInit();
-                    bitmapImage.StreamSource = new System.IO.MemoryStream(imageBytes);
-                    bitmapImage.EndInit();
+                    string imgPath = LocalLogic.GetLocalImagePath(CardsFolderPath, CurrentCardId, CurrentImageRatio);
+                    if (string.IsNullOrEmpty(imgPath)) return;
+                    if (!File.Exists(imgPath)) return;
 
-                    YuGiOhImage.Source = bitmapImage;
+                    CurrentCardImagePath = imgPath;
+
+                    _previewWindow.UpdateImage(CurrentCardImagePath, CurrentCardWidth, CurrentCardHeight);
                 }
-                catch (Exception ex)
+            }
+        }
+
+        private void SuggestionListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            _ = CardFound();
+        }
+
+
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SuggestionListBox.Items.Clear();
+            foreach (KeyValuePair<string, int> entry in SuggestionDictionary)
+            {
+                string key = entry.Key;
+                if (key.ToLower().Contains(SearchBox.Text.ToLower()))
                 {
-                    MessageBox.Show($"Error downloading image: {ex.Message}");
+                    SuggestionListBox.Items.Add(entry.Key);
                 }
+            }
+        }
+
+        private void CustomWidthTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_previewWindow == null) return;
+            if (CurrentImageRatio != ImageRatio.Undefine) return;
+            if(int.TryParse(CustomWidthTextBox.Text, out var width))
+            {
+                CurrentCardWidth = width;
+                _previewWindow.UpdateImage(CurrentCardImagePath, CurrentCardWidth, CurrentCardHeight);
+            }
+        }
+
+        private void CustomHeightTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_previewWindow == null) return;
+            if (CurrentImageRatio != ImageRatio.Undefine) return;
+            if (int.TryParse(CustomHeightTextBox.Text, out var height))
+            {
+                CurrentCardHeight = height;
+                _previewWindow.UpdateImage(CurrentCardImagePath, CurrentCardWidth, CurrentCardHeight);
+            }
+        }
+
+        private void ImageRatioSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            HandleImageSelectorChange();
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if(_previewWindow != null)
+            {
+                _previewWindow.Close();
             }
         }
     }

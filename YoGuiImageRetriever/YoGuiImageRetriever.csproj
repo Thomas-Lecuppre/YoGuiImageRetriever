@@ -6,6 +6,12 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <Title>Yo Gui Image Retriever</Title>
+    <Authors>Thomas Lecuppre</Authors>
+    <Company>Thomas Lecuppre</Company>
+    <Description>This app allow you to pop a window containing the Yo Gi Oh card you selected in the app. This app has been thinking to help streamer to capture the preview window.</Description>
+    <Copyright>MIT license</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
