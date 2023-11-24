@@ -13,10 +13,48 @@
     <Description>This app allow you to pop a window containing the Yo Gi Oh card you selected in the app. This app has been thinking to help streamer to capture the preview window.</Description>
     <Copyright>MIT license</Copyright>
     <PackageTags>Yo;Gui;Oh;Gi;Image;Retriever</PackageTags>
+    <ApplicationIcon>logo_ico.ico</ApplicationIcon>
+    <PackageIcon>Capture_decran_2023-11-24_190853.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\logo_ico.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="logo_ico.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\..\Downloads\Capture_decran_2023-11-24_190853.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\logo_ico.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Selenium.WebDriver" Version="4.15.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

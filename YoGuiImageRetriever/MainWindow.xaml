@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:YoGuiImageRetriever"
         mc:Ignorable="d"
-        Title="Yo Gui Image Retriever - By Thomas Lecuppre" 
+        Title="Yo Gui Image Retriever" 
         MinHeight="700" 
         MinWidth="750"
         Height="700"
@@ -19,8 +19,9 @@
             <RowDefinition Height="auto" />
 			<RowDefinition Height="auto" />
 			<RowDefinition Height="auto" />
-			<RowDefinition Height="*" />
-		</Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
 
 		<Grid Grid.Row="0"
 			  Margin="2">
@@ -112,17 +113,22 @@
 
         </Grid>
 
-		<ListBox x:Name="SuggestionListBox" 
+        <ListBox x:Name="SuggestionListBox"
                  Grid.Row="3"
-				 Margin="2"
-				 MouseDoubleClick="SuggestionListBox_MouseDoubleClick"/>
+                 Margin="2"
+                 MouseDoubleClick="SuggestionListBox_MouseDoubleClick" />
 
-		<Image
-            x:Name="YuGiOhImage" 
-            Grid.Row="1"
-            Stretch="Uniform"
-			HorizontalAlignment="Center"
-			VerticalAlignment="Center"/>
+        <Grid Grid.Row="4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto" />
+                <RowDefinition Height="auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock FontSize="10"
+                       Margin="2"
+                Text="Credit to : Thomas Lecuppre (programmer), VeXi (app icon creator)" />
+
+        </Grid>
 
     </Grid>
 </Window>
