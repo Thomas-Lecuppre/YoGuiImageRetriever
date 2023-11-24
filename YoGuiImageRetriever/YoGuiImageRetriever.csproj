@@ -12,6 +12,7 @@
     <Company>Thomas Lecuppre</Company>
     <Description>This app allow you to pop a window containing the Yo Gi Oh card you selected in the app. This app has been thinking to help streamer to capture the preview window.</Description>
     <Copyright>MIT license</Copyright>
+    <PackageTags>Yo;Gui;Oh;Gi;Image;Retriever</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
